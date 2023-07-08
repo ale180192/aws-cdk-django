@@ -1,0 +1,11 @@
+[dev]
+NAMESPACE = "dev"
+PROJECT_NAME = "djangoapp"
+[prod]
+NAMESPACE = "prod"
+PROJECT_NAME = "djangoapp"
+[pipeline]
+NAMESPACE = "tools"
+PROJECT_NAME = "djangoapp"
+
+
