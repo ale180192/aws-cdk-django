@@ -33,7 +33,13 @@ def main(event, context):
         logger.info(event["body"])
         logger.info(type(event["body"]))
 
-    app = Mangum(application, lifespan="off")
+        if isinstance(event["body"], str):
+            event["body"] = json.loads(event["body"])
+        else:
+            event["body"] = json.loads(event["body"].decode())
+
+    response = application(event, context)
+    app = Mangum(response, lifespan="off")
     return app(event, context)
 
 # if __name__ == "__main__":
