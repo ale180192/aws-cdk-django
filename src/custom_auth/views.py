@@ -35,7 +35,12 @@ def signup(request: HttpRequest):
     """
     logger.info("request data: ")
     logger.info(request.data)
-    ser = SignupRequestSerializer(data=request.data)
+    logger.info(type(request.data))
+    import json
+    data = json.loads(request.data)
+    logger.info(request.body)
+    logger.info(type(request.body))
+    ser = SignupRequestSerializer(data=data)
     if not ser.is_valid(raise_exception=True):
         return Response(
             data={"error": "name, password and email are required to register a user."},
