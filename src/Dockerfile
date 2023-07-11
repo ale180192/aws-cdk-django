@@ -1,19 +1,17 @@
-FROM amazon/aws-lambda-python:3.8
+FROM python:3.9
 
-ARG FUNCTION_DIR="/var/task"
+# Directorio de trabajo
+WORKDIR /app
 
-RUN mkdir -p ${FUNCTION_DIR}
+# Copiar archivos de la aplicación
+COPY . /app
 
-# Copy function code
-# COPY app/ ${FUNCTION_DIR}/app
-COPY . ${FUNCTION_DIR}/
-COPY entrypoint/handler.py ${FUNCTION_DIR}
+# Instalar dependencias
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy requirements
-COPY requirements.txt ${FUNCTION_DIR}
+# Puerto expuesto por la aplicación
+EXPOSE 8000
 
-# Install the function's dependencies using file requirements.txt
-# from your project folder.
-RUN pip3 install --upgrade pip
-RUN pip3 install -r ${FUNCTION_DIR}/requirements.txt
-CMD [ "handler.main" ]
+# Comando para ejecutar la aplicación
+CMD ["gunicorn", "app.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4"]
+

@@ -1,21 +1,25 @@
 import os
 import json
-from typing import Tuple
 
 from aws_cdk import (
     Stack,
-    aws_iam as iam,
-    aws_lambda as _lambda,
-    aws_apigateway as gateway,
     aws_rds as rds,
     aws_ec2 as ec2,
     aws_secretsmanager as secrets,
     RemovalPolicy,
     CfnOutput,
-    Duration,
+    aws_ec2 as ec2,
+    aws_sqs as sqs,
+    aws_ecs as ecs,
+    aws_ecs_patterns as ecs_patterns,
+    aws_certificatemanager as acm,
+    aws_elasticloadbalancingv2 as elbv2,
+    aws_ssm as ssm,
+    aws_iam as iam
 )
 from constructs import Construct
 from configuration.configuration_loader import ConfigurationLoader as Conf
+
 from enums import EnvironmentType
 
 dirname = os.path.dirname(__file__)
@@ -70,9 +74,12 @@ class DjangoApiStack(Stack):
                 )
             ]
         )
+        # ecs cluster
+        ecs_cluster = ecs.Cluster(self, f"ECSCluster", vpc=vpc)
+
 
         # SG
-        lambda_sg_name = Conf.build_naming_convention(
+        ec2_sg_name = Conf.build_naming_convention(
             env=environment,
             name="lambda sg"
         )
@@ -83,7 +90,7 @@ class DjangoApiStack(Stack):
 
         lambda_sg = ec2.SecurityGroup(
             self,
-            id=lambda_sg_name,
+            id=ec2_sg_name,
             vpc=vpc,
             allow_all_outbound=True,
             description=f"Lambda sg"
@@ -106,7 +113,7 @@ class DjangoApiStack(Stack):
         rds_sg.add_ingress_rule(
             peer=lambda_sg,
             connection=ec2.Port.tcp(sql_port),
-            description=f"{lambda_sg_name} Allow port "
+            description=f"{ec2_sg_name} Allow port "
         )
 
         # secrets
@@ -149,64 +156,123 @@ class DjangoApiStack(Stack):
                 subnet_type=ec2.SubnetType.PUBLIC
             ),
         )
+        env_vars = environment={
+            "RDS_HOST": rds_instance.instance_endpoint.hostname,
+            "RDS_DB_NAME": db_name,
+            "AWS_SECRET_ID": db_credentials_secret_name
+        }
+        secrets_values = {}
 
-
-        # lambda
-        lambda_django = _lambda.DockerImageFunction(
-            scope=self,
-            id="apilambda",
-            code=_lambda.DockerImageCode.from_image_asset(
-                os.path.join(dirname, "../src"),
-                file="./Dockerfile"
-            ),
-            memory_size=128,
-            vpc=vpc,
-            vpc_subnets=ec2.SubnetSelection(
-                subnet_type=ec2.SubnetType.PRIVATE_WITH_EGRESS
-            ),
-            security_groups=[lambda_sg],
-            timeout=Duration.seconds(60),
-            environment={
-                "RDS_DB_NAME": db_name,
-                "AWS_SECRET_ID": db_credentials_secret_name
-            }
+        ##########  elb   ####################
+        task_cpu = 256
+        task_memory_mib = 1024
+        task_desired_count = 2
+        task_min_scaling_capacity = 2
+        task_max_scaling_capacity = 4
+        # Prepare parameters
+        self.container_name = f"django_app"
+        # Retrieve the arn of the TLS certificate from SSM Parameter Store
+        self.certificate_arn = "todo: poner"
+        # Instantiate the certificate which will be required by the load balancer later
+        domain_certificate = acm.Certificate.from_certificate_arn(
+            self, "DomainCertificate",
+            certificate_arn=self.certificate_arn
+        )
+        # policy to read the secrets
+        secret_access_policy = iam.PolicyStatement(
+            actions=["secretsmanager:GetSecretValue"],
+            resources=[db_credentials_secret.secret_arn]
         )
 
-        db_credentials_secret.grant_read(lambda_django)
-        
-        # API gateway
-        api_gateway_name = Conf.build_naming_convention(
-            env=environment,
-            name="DjangoGw"
-        )
-        api = gateway.LambdaRestApi(
-            scope=self,
-            id=api_gateway_name,
-            rest_api_name=api_gateway_name,
-            api_key_source_type=gateway.ApiKeySourceType.HEADER,
-            default_cors_preflight_options={
-                "allow_origins": gateway.Cors.ALL_ORIGINS,
-                "allow_methods": gateway.Cors.ALL_METHODS
-            },
-            proxy=True,
-            handler=lambda_django
-        )
-
-        api_id_name = Conf.build_naming_convention(
-            env=environment,
-            name="DjangoApiIdGw"
-        )
-        CfnOutput(
+        # Añade la política de acceso al rol de ejecución de la tarea
+        task_role = iam.Role(
             self,
-            id=api_id_name,
-            export_name=api_id_name,
-            value=api.rest_api_id
+            "TaskRole",
+            assumed_by=iam.ServicePrincipal("ecs-tasks.amazonaws.com")
+        )
+        task_role.add_to_policy(secret_access_policy)
+
+
+        # Create the load balancer, ECS service and fargate task for teh Django App
+        self.alb_fargate_service = ecs_patterns.ApplicationLoadBalancedFargateService(
+            self,
+            f"MyDjangoApp",
+            protocol=elbv2.ApplicationProtocol.HTTPS,
+            certificate=domain_certificate,
+            redirect_http=True,
+            platform_version=ecs.FargatePlatformVersion.VERSION1_4,
+            cluster=ecs_cluster,  # Required
+            task_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC),
+            cpu=task_cpu,  # Default is 256
+            memory_limit_mib=task_memory_mib,  # Default is 512
+            desired_count=task_desired_count,  # Default is 1
+            task_image_options=ecs_patterns.ApplicationLoadBalancedTaskImageOptions(
+                image=ecs.ContainerImage.from_asset(
+                    directory="../src",
+                    file="./Dockerfile",
+                    # target="prod"
+                ),
+                container_name=self.container_name,
+                container_port=8000,
+                environment=env_vars,
+                secrets=secrets_values,
+                task_role=task_role
+            ),
+            public_load_balancer=True
+        )
+        # Set the health checks settings
+        self.alb_fargate_service.target_group.configure_health_check(
+            path="/healthcheck",
+            healthy_threshold_count=3,
+            unhealthy_threshold_count=2
+        )
+        # Autoscaling based on CPU utilization
+        scalable_target = self.alb_fargate_service.service.auto_scale_task_count(
+            min_capacity=task_min_scaling_capacity,
+            max_capacity=task_max_scaling_capacity
+        )
+        scalable_target.scale_on_cpu_utilization(
+            f"CpuScaling",
+            target_utilization_percent=75,
+        )
+        # Save useful values in in SSM
+        self.ecs_cluster_name_param = ssm.StringParameter(
+            self,
+            "EcsClusterNameParam",
+            parameter_name=f"/{scope.stage_name}/EcsClusterNameParam",
+            string_value=ecs_cluster.cluster_name
+        )
+        self.task_def_arn_param = ssm.StringParameter(
+            self,
+            "TaskDefArnParam",
+            parameter_name=f"/{scope.stage_name}/TaskDefArnParam",
+            string_value=self.alb_fargate_service.task_definition.task_definition_arn
+        )
+        self.task_def_family_param = ssm.StringParameter(
+            self,
+            "TaskDefFamilyParam",
+            parameter_name=f"/{scope.stage_name}/TaskDefFamilyParam",
+            string_value=f"family:{self.alb_fargate_service.task_definition.family}"
+        )
+        self.exec_role_arn_param = ssm.StringParameter(
+            self,
+            "TaskExecRoleArnParam",
+            parameter_name=f"/{scope.stage_name}/TaskExecRoleArnParam",
+            string_value=self.alb_fargate_service.task_definition.execution_role.role_arn
+        )
+        self.task_role_arn_param = ssm.StringParameter(
+            self,
+            "TaskRoleArnParam",
+            parameter_name=f"/{scope.stage_name}/TaskRoleArnParam",
+            string_value=self.alb_fargate_service.task_definition.task_role.role_arn
         )
         CfnOutput(
             scope=self,
             id="dbEndpoint",
             value= rds_instance.instance_endpoint.hostname,
             description="db host")
+
+
 
         
         
