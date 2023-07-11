@@ -13,5 +13,5 @@ RUN pip install --no-cache-dir -r requirements.txt
 EXPOSE 8000
 
 # Comando para ejecutar la aplicación
-CMD ["gunicorn", "app.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4"]
+CMD ["gunicorn", "djangoapi.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "4"]
 
