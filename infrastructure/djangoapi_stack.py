@@ -172,12 +172,12 @@ class DjangoApiStack(Stack):
         # Prepare parameters
         self.container_name = f"django_app"
         # Retrieve the arn of the TLS certificate from SSM Parameter Store
-        self.certificate_arn = "todo: poner"
-        # Instantiate the certificate which will be required by the load balancer later
-        domain_certificate = acm.Certificate.from_certificate_arn(
-            self, "DomainCertificate",
-            certificate_arn=self.certificate_arn
-        )
+        # self.certificate_arn = "todo: poner"
+        # # Instantiate the certificate which will be required by the load balancer later
+        # domain_certificate = acm.Certificate.from_certificate_arn(
+        #     self, "DomainCertificate",
+        #     certificate_arn=self.certificate_arn
+        # )
         # policy to read the secrets
         secret_access_policy = iam.PolicyStatement(
             actions=["secretsmanager:GetSecretValue"],
@@ -197,9 +197,8 @@ class DjangoApiStack(Stack):
         self.alb_fargate_service = ecs_patterns.ApplicationLoadBalancedFargateService(
             self,
             f"MyDjangoApp",
-            protocol=elbv2.ApplicationProtocol.HTTPS,
-            certificate=domain_certificate,
-            redirect_http=True,
+            protocol=elbv2.ApplicationProtocol.HTTP,
+            redirect_http=False,
             platform_version=ecs.FargatePlatformVersion.VERSION1_4,
             cluster=ecs_cluster,  # Required
             task_subnets=ec2.SubnetSelection(subnet_type=ec2.SubnetType.PUBLIC),
