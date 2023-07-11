@@ -18,13 +18,6 @@ name_pipeline = Conf.build_naming_convention(
     env=EnvironmentType.PIPELINE.value
 )
 
-print()
-print()
-print()
-print()
-print("*******************************")
-print(name_pipeline)
-
 env_pipeline = Environment(
     account=pipeline_stack.PIPELINE_ACCOUNT,
     region=pipeline_stack.PIPELINE_REGION

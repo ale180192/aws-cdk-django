@@ -101,8 +101,6 @@ DATABASES = {
         },
     }
 }
-print("databasesss:")
-print(DATABASES)
 
 
 # Password validation

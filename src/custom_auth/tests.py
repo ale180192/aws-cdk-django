@@ -30,10 +30,8 @@ class AuthTestView(APITestCase):
             'password': "T3stP@s5Word!"
         }
         users = User.objects.all()
-        print("users: ", users)
         response = self.client.post(url, data=body_request)
         body_response = response.json()
-        print(body_response)
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(body_response['ok'], True)
         self.assertTrue(body_response['user'])

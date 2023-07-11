@@ -56,7 +56,6 @@ def signup(request: HttpRequest):
             
 
     except IntegrityError as e:
-        print(str(e))
         msg = f"Email {ser.data['email']} already exist!"
         logger.warning(msg)
         return Response(
