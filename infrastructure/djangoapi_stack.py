@@ -74,6 +74,39 @@ class DjangoApiStack(Stack):
                 )
             ]
         )
+
+        self.ecr_api_private_link = ec2.InterfaceVpcEndpoint(
+            self,
+            "ECRapiEndpoint",
+            vpc=self.vpc,
+            service=ec2.InterfaceVpcEndpointAwsService.ECR,
+            open=True,
+            private_dns_enabled=True
+        )
+        self.ecr_dkr_private_link = ec2.InterfaceVpcEndpoint(
+            self,
+            "ECRdkrEndpoint",
+            vpc=self.vpc,
+            service=ec2.InterfaceVpcEndpointAwsService.ECR_DOCKER,
+            open=True,
+            private_dns_enabled=True
+        )
+        self.cloudwatch_private_link = ec2.InterfaceVpcEndpoint(
+            self,
+            "CloudWatchEndpoint",
+            vpc=self.vpc,
+            service=ec2.InterfaceVpcEndpointAwsService.CLOUDWATCH_LOGS,
+            open=True,
+            private_dns_enabled=True
+        )
+        self.secrets_manager_private_link = ec2.InterfaceVpcEndpoint(
+            self,
+            "SecretsManagerEndpoint",
+            vpc=self.vpc,
+            service=ec2.InterfaceVpcEndpointAwsService.SECRETS_MANAGER,
+            open=True,
+            private_dns_enabled=True
+        )
         # ecs cluster
         ecs_cluster = ecs.Cluster(self, f"ECSCluster", vpc=vpc)
 

@@ -83,7 +83,8 @@ We defined a DjangoApiStage that represents the sandbox and productio environmen
 
 
 
-#### Bastion instance
+#### Bastion instance 
+Note: this bastion is not implemented in this repo but we keep it in order to have the documentation of how makes the connection to the instance
 We create a bastion instance which has open de port ssh 22 and this one has permission to connect to the rds database, is the unique way to connect to our database and this gives a great security, in this bastion we can ability a whitelist of ips with permissions to be abble to connect.
 
 on the cloud form console into the stack -> ouputs tab -> we can see the hostname/ip of this bastion(ssh hostname), the user is `ec2-user`, the ssh key file is the ssh that we create manually on the ec2 console and assigned to the bastion machine. The Mysql hostname is the `proxyDbEndpoint` that have into the stack outputs, the username and password are into the secretsmanager.
@@ -91,6 +92,8 @@ on the cloud form console into the stack -> ouputs tab -> we can see the hostnam
 <img src="infrastructure/doc/images/mysql_bastion_connection.png" alt="Logo de mi proyecto" width="600">
 
 
+#### Aws services (arquichecture)
+We deploy the django api into an ECS cluster and we attach a load balancer to this. The application will be able to scale horizontally. See the infrastructure.djangoapi_stack file to see in more detail all the componentes. We also use a RDS postgres instance as database.
 
 #### Install python packages
 ```bash
@@ -117,12 +120,33 @@ pip install "psycopg[binary]"
 ```
 
 
-Run the local api's server
+### Run the local api's server
+First we need to create an .env file into the src folder, the .env.template has all the keys that need to.
+
+TODO: adds a docker compose to local development.
 ```bash
 # on the root project
 python3 -m venv .venv-api
 source .venv-api/bin/activate
 pip install -r src/requirements.txt
-cd source
-ENVIRONMENT=local uvicorn entrypoint.handler:app --reload
+cd src
+ENVIRONMENT=local gunicorn djangoapi.wsgi:application --bind 0.0.0.0:8000 --reload
+```
+
+#### Runs migrations
+The first time we need to run the migrations in order to create the tables.
+```bash
+ENVIRONMENT=local python manage.py migrate
+```
+
+
+#### API Schema Docs
+The docs is generate with the standar open api 3. The src/docs/api_schema.yaml file is the documentation of the api and this one we can view it in any only viewer for example [swagger](https://editor.swagger.io/), just copy-paste the open api yaml
+
+<img src="infrastructure/doc/images/openapi.png" alt="openapi" width="600">
+
+
+#### Unit test
+```bash
+ENVIRONMENT=local python manage.py test -n2
 ```

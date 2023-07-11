@@ -1,0 +1,78 @@
+openapi: 3.0.0
+info:
+  title: aws cdk djangoapi
+  version: 1.0.0
+servers:
+  - url: http://{{base_url}}
+tags:
+  - name: blog
+paths:
+  /blog/retrieve_data_blog:
+    post:
+      tags:
+        - blog
+      summary: retrieve blog
+      requestBody:
+        content: {}
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json: {}
+  /blog/posts:
+    get:
+      tags:
+        - blog
+      summary: list blogs
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json: {}
+  /healthcheck:
+    get:
+      tags:
+        - default
+      summary: health check
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json: {}
+  /auth/login:
+    post:
+      tags:
+        - default
+      summary: get token
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                email: test@email.com
+                password: Securepwd1
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json: {}
+  /auth/signup:
+    post:
+      tags:
+        - default
+      summary: signup
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              example:
+                email: test@email.com
+                password: Securepwd1
+                name: alex
+      responses:
+        '200':
+          description: Successful response
+          content:
+            application/json: {}
