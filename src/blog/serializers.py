@@ -6,7 +6,7 @@ class CommentsSerializer(serializers.HyperlinkedModelSerializer):
 
     class Meta:
         model = Comments
-        fields = ['name', 'email']
+        fields = ['name', 'email', 'body', 'id']
 
 class PostSerializer(serializers.ModelSerializer):
     comments = CommentsSerializer(many=True, read_only=True)

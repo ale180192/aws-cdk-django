@@ -33,11 +33,6 @@ def signup(request: HttpRequest):
     :param request: The incoming request.
     :return: Return http response 201 if user is created successfully, or a 40X error otherwise.
     """
-    logger.info("request data: ")
-    logger.info(request.data)
-    logger.info(type(request.data))
-    logger.info(request.body)
-    logger.info(type(request.body))
     ser = SignupRequestSerializer(data=request.data)
     if not ser.is_valid(raise_exception=True):
         return Response(

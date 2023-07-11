@@ -11,7 +11,7 @@ class CustomUser(AbstractUser):
     updated_at = models.DateTimeField(null=True, auto_now=True)
     is_password_set = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
-
+    username = None
     USERNAME_FIELD = "email"
     REQUIRED_FIELDS = []
 
